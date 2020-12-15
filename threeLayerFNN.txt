@@ -1,0 +1,132 @@
+def sigmoid(x):
+    return 1/(1 + np.exp(-x))
+def ThreeLayerFNN(x,t,size_h,batch_size,l,epochs):
+    #三层前向神经网络，激活函数使用双曲正切，输出层激活函数使用sigmoid函数，误差函数是平方误差函数。
+    #参数
+    #x:数据点，需要是numpy类型，shape=(N,d)。
+    #t:标签，需要时numpy类型，shape=(N,)。
+    #size_h：隐藏层节点个数
+    #batch_size:分批处理，一批处理的数量是多少，单样本更新那么就是1。
+    #l:更新步长。
+    #epochs:对样本一共重复处理多少遍。
+    #首先确定各层的神经元个数，如下：
+    #     Input:d
+    #     hidden:size_h
+    #     output:c
+    #x:(n,d),t:(n,)
+    d=len(x[0])
+    c=len(np.unique(t))
+    wih=np.ones((d+1)*size_h).reshape(d+1,size_h)#initailization wih (d+1)*size_h
+    who=np.ones((size_h+1)*c).reshape((size_h+1,c))#initailization wih (size_h+1,c）
+    #  normalize x from (2,3,4) to (2,3,4,1),add a 1.
+    ones=np.ones(x.shape[0])[:,np.newaxis]
+    n_x=np.hstack((x,ones))
+    # normalize the t,label 1 to [0,1,0]
+    n_t=np.zeros((t.shape[0],c))
+    # fill the label 1 to the right position.
+    labels=np.unique(t)
+    
+    for i in range(c):
+        label=np.argwhere(t==labels[i])
+        #confusing that this is (k,1) why not (k,)
+        #         print(label)
+        #list is [1,2] then n_t[list] is nt[1,2] ,the [] is deleted
+        label=label.reshape((label.shape[0]))
+        #print(label)
+        #the numpy index i always forget ,i think n_t[label][i],fuck.
+        n_t[label,i]=1
+    #n_x:(n,d+1),n_t:(n,c)
+    #divide the data into batches
+    
+    #start forward
+    
+    N=x.shape[0]
+    loop=int(N/batch_size)
+    add1=N%batch_size
+    losses=[]
+    
+    if(add1!=0):
+        loop=loop+1
+    for epochs in range(epochs):
+        #print("epochs:",epochs)
+        if(epochs!=0):
+            losses.append(loss)
+        loss=0
+        
+        for i in range(loop):
+            
+            #a batch of x:(batch_size,d+1)
+            nxb=n_x[i*batch_size:(i+1)*batch_size,:]
+
+            #a batch of x:(batch_size,c)
+            ntb=n_t[i*batch_size:(i+1)*batch_size,:]
+            
+            y1=np.dot(nxb,wih)#(batch_size,d)*(d+1,size_h)=(batch_size,size_h)
+
+            #activate
+            y2=np.tanh(y1)#(batch_size,size_h)
+            #extend
+            ones=np.ones(y2.shape[0]).reshape(batch_size,1)#batch_size*1
+            y3=np.hstack((y2,ones))#(batch_size,size_h+1)
+            z1=np.dot(y3,who)#(batch_size,size_h+1)*(size_h+1,c)=(batch_size,c)
+            z2=sigmoid(z1)#(batch_size,c)
+            #forward done
+            
+            #caculate the gradient.
+            #print(t_b-z)
+            
+    
+            loss=loss+np.sum(0.5*(ntb-z2)*(ntb-z2))
+            grad_z2=z2-ntb#(batch_size,c)
+            grad_z1=grad_z2*(1-z2)*z2
+            grad_who=np.dot(y3.T,grad_z1)#(size_h+1,c)
+            grad_y3=np.dot(grad_z1,who.T)#(batch_size,size_h+1)
+    #             print(grad_y3)
+            grad_y2=grad_y3[:,0:size_h]#(batch_size,size_h)
+    #             print(grad_y2)
+    #             print(y2)
+            grad_y1=grad_y2*(1-y2*y2)#(batch_size,size_h)
+            grad_wih=np.dot(nxb.T,grad_y1)#(d+1,size_h)
+            #upgrade the weight
+            wih=wih-l*grad_wih
+            who=who-l*grad_who
+            #if(i%5==0):
+                #print(loss)
+
+    #     for data in x:
+    losses.append(loss)
+    return wih,who,losses
+def predicate(wih,who,x):
+    #和前面的forward有些重复，就只有最后一句不一样，一个是返回预测标签，一个是返回前向的值，由于有很多都要参数要返回，比如y1,y2,y3,z等。
+    #所以这里不采用了，
+    ones=np.ones(x.shape[0])[:,np.newaxis]
+    n_x=np.hstack((x,ones))
+    y1=np.dot(n_x,wih)#(batch_size,d)*(d+1,size_h)=(batch_size,size_h)
+    #activate
+    y2=np.tanh(y1)#(batch_size,size_h)
+    #extend
+    ones=np.ones(y2.shape[0]).reshape(len(x),1)#batch_size*1
+    y3=np.hstack((y2,ones))#(batch_size,size_h+1)
+    z1=np.dot(y3,who)#(batch_size,size_h+1)*(size_h+1,c)=(batch_size,c)
+    z2=sigmoid(z1)#(batch_size,c)
+    
+    return np.argmax(z2,axis=1)
+
+
+example:
+
+ThreeLayerFNN(xv,tv,1,1,0.5,1)
+it will return:
+(array([[0.75369199],
+        [0.14970377],
+        [1.75788669],
+        [0.25985617]]),
+ array([[0.20576594, 0.84002048, 1.19563345],
+        [0.03410257, 0.21095683, 0.25232426]]),
+ [14.86514155853806])
+the first is the wih,the second is the who,the last is the loss of 1 epoch,because i set the epochs=1.
+
+example:
+
+labels=predicate(wih,who,x)
+labels
